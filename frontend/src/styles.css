@@ -118,6 +118,39 @@
   font-size: 0.9rem;
 }
 
+.log-panel {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.log-panel-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: #374151;
+}
+
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.log-entry {
+  padding: 0.15rem 0;
+  color: #374151;
+}
+
+.log-entry-error {
+  color: #b91c1c;
+}
+
 .results {
   max-width: 960px;
   margin: 0 auto;

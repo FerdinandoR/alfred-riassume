@@ -45,44 +45,84 @@ type AnalyzeResponse = {
   reviews: ReviewWithSentiment[];
 };
 
+type LogLevel = 'info' | 'error';
+
+type LogEntry = {
+  id: number;
+  level: LogLevel;
+  message: string;
+};
+
 export const App: React.FC = () => {
   const [url, setUrl] = useState('');
   const [sourceMode] = useState<'scraper' | 'placesApi'>('scraper');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AnalyzeResponse | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logCounter, setLogCounter] = useState(0);
+
+  const pushLog = (message: string, level: LogLevel = 'info') => {
+    setLogCounter((prev) => prev + 1);
+    const id = logCounter + 1;
+    setLogs((prev) => [...prev, { id, level, message }]);
+  };
 
   const handleAnalyze = async () => {
     setError(null);
     setData(null);
+    setLogs([]);
+    pushLog('Starting analysis for the provided Google Maps place URL…');
 
     if (!url.trim()) {
-      setError('Please paste a Google Maps place URL.');
+      const msg = 'Validation failed: please paste a Google Maps place URL.';
+      setError(msg);
+      pushLog(msg, 'error');
       return;
     }
 
     setLoading(true);
+    pushLog('Sending request to backend and starting headless scraping…');
+    pushLog(
+      'Backend will launch a headless browser, open the reviews panel, scroll to load reviews, and then run Groq analysis. This can take up to ~60 seconds for busy places.',
+    );
+
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), sourceMode }),
       });
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Request failed');
+        const errBody = await res.json().catch(() => ({}));
+        const backendMessage =
+          errBody.message ||
+          errBody.error ||
+          'Backend returned a non‑OK status.';
+        pushLog(`Backend error during analysis: ${backendMessage}`, 'error');
+        throw new Error(backendMessage);
       }
+
+      pushLog('Backend finished scraping, now returning analysis results…');
       const json = (await res.json()) as AnalyzeResponse;
       setData(json);
+      pushLog(
+        `Analysis completed. Retrieved ${json.report.totalReviews} reviews and computed sentiment + recurring themes.`,
+      );
     } catch (e: any) {
-      setError(e.message || 'Unexpected error');
+      const msg = e?.message || 'Unexpected error during analysis.';
+      setError(msg);
+      pushLog(msg, 'error');
     } finally {
       setLoading(false);
+      pushLog('Analysis request finished.');
     }
   };
 
   const handleExportPdf = async () => {
     if (!data) return;
+    pushLog('Requesting PDF generation from backend…');
     try {
       const res = await fetch('/api/report/pdf', {
         method: 'POST',
@@ -93,7 +133,13 @@ export const App: React.FC = () => {
         }),
       });
       if (!res.ok) {
-        throw new Error('Failed to generate PDF');
+        const errBody = await res.json().catch(() => ({}));
+        const backendMessage =
+          errBody.message ||
+          errBody.error ||
+          'Failed to generate PDF on backend.';
+        pushLog(`Backend error during PDF generation: ${backendMessage}`, 'error');
+        throw new Error(backendMessage);
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -102,8 +148,11 @@ export const App: React.FC = () => {
       a.download = 'review-report.pdf';
       a.click();
       window.URL.revokeObjectURL(url);
+      pushLog('PDF generated and download started.');
     } catch (e: any) {
-      setError(e.message || 'Failed to export PDF');
+      const msg = e?.message || 'Failed to export PDF.';
+      setError(msg);
+      pushLog(msg, 'error');
     }
   };
 
@@ -162,6 +211,22 @@ export const App: React.FC = () => {
         </button>
 
         {error && <div className="error-banner">{error}</div>}
+
+        {logs.length > 0 && (
+          <div className="log-panel" aria-live="polite">
+            <h3 className="log-panel-title">Activity log</h3>
+            <ul className="log-list">
+              {logs.map((log) => (
+                <li
+                  key={log.id}
+                  className={`log-entry log-entry-${log.level}`}
+                >
+                  {log.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {data && (
