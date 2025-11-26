@@ -1,10 +1,11 @@
-import fetch from 'node-fetch';
 import {
   RecurringIssue,
   Review,
   ReviewSentiment,
   ReviewWithSentiment,
 } from '../types';
+
+declare const process: any;
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.1-70b-versatile';
